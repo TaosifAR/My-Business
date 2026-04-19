@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart'; // GetX import korun
+import 'package:my_business/bindings/initial_bindings.dart';
 import 'package:my_business/features/home/views/home_screen.dart';
+import 'package:my_business/features/seller%20dashboard/views/seller_dashboard_screen.dart';
 
 
 void main() {
@@ -15,6 +17,7 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
   debugShowCheckedModeBanner: false,
   title: 'My Business',
+  initialBinding: InitialBindings(),
   theme:ThemeData(
   useMaterial3: true,
   // Primary color hishebe Deep Navy r Accent hishebe Emerald Green
@@ -48,7 +51,7 @@ class MyApp extends StatelessWidget {
     ),
   ),
 ),
-  home: const HomeScreen(),
+  home: HomeScreen(),
 );
   }
 }
