@@ -11,19 +11,21 @@ class SellerDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final SellerDashboardController controller = Get.find<SellerDashboardController>();
-    final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+    // Get.find ekhane ekbar kora-i bhalo
+    final controller = Get.find<SellerDashboardController>();
+    final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
 
     return Scaffold(
-      key: _scaffoldKey,
+      key: scaffoldKey,
+      backgroundColor: Colors.white,
       appBar: CustomAppBar(
         title: "Dashboard",
         showBackButton: true,
-        scaffoldKey: _scaffoldKey,
+        scaffoldKey: scaffoldKey,
       ),
       drawer: const AppDrawer(),
       body: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(12.0),
         child: Column(
           children: [
             const Padding(
@@ -31,13 +33,12 @@ class SellerDashboardScreen extends StatelessWidget {
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  " Product Inventory",
+                  "Product Inventory",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
 
-            // Obx use kora holo jate list update holei ekhane dekhay
             Expanded(
               child: Obx(() {
                 if (controller.products.isEmpty) {
@@ -47,12 +48,17 @@ class SellerDashboardScreen extends StatelessWidget {
                   itemCount: controller.products.length,
                   itemBuilder: (context, index) {
                     final product = controller.products[index];
+                    
+                    // FIX: Key names update kora hoyeche (Firebase sync-er sathe mil rekhe)
                     return InkWell(
                       onTap: () => Get.to(() => ProductInfoScreen(index: index)),
                       child: ProductBannerCard(
-                        productCode: product['productCode'],
-                        quantity: int.parse(product['quantity']),
-                        price: double.parse(product['sellingPrice']),
+                        productCode: product['productCode'] ?? "N/A",
+                        // Firebase-e amra 'totalQuantity' name save korechi
+                        quantity: product['totalQuantity'] ?? 0, 
+                        price: (product['sellingPrice'] is int) 
+                                ? (product['sellingPrice'] as int).toDouble() 
+                                : (product['sellingPrice'] ?? 0.0),
                       ),
                     );
                   },
@@ -62,16 +68,21 @@ class SellerDashboardScreen extends StatelessWidget {
 
             // Add Product Button
             Padding(
-              padding: const EdgeInsets.only(top: 10, bottom: 20),
+              padding: const EdgeInsets.only(top: 10, bottom: 10),
               child: SizedBox(
                 height: 55,
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: () => controller.openAddProductForm(),
-                  icon: const Icon(Icons.add_a_photo, color: Colors.white),
-                  label: const Text('Add New Product', style: TextStyle(color: Colors.white)),
+                  onPressed: () {
+                    // Direct call without Get.find repeat
+                    controller.openAddProductForm();
+                  },
+                  icon: const Icon(Icons.add, color: Colors.white),
+                  label: const Text('Add New Product', 
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0F172A),
+                    elevation: 2,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
                 ),

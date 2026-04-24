@@ -1,7 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 class SellerDashboardController extends GetxController {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   // Input Controllers
   final productCodeController = TextEditingController();
   final quantityController = TextEditingController();
@@ -11,10 +16,41 @@ class SellerDashboardController extends GetxController {
   // Observable Variables
   var sizeQuantities = <String, int>{}.obs;
   var products = <Map<String, dynamic>>[].obs;
-  var isEditMode = false.obs; 
+  var isLoading = false.obs;
+  var isEditMode = false.obs;
+  var currentEditingDocId = "".obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    // Start listening to data as soon as the controller initializes
+    listenToProducts();
+  }
+
+  // --- Real-time Data Sync ---
+  // Listens to products belonging only to the logged-in user
+  void listenToProducts() {
+    String? uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    _firestore
+        .collection('products')
+        .where('sellerId', isEqualTo: uid) // Filter data by the current user's UID
+        .snapshots()
+        .listen((snapshot) {
+      products.value = snapshot.docs.map((doc) {
+        var data = doc.data();
+        data['docId'] = doc.id;
+        return data;
+      }).toList();
+    });
+  }
 
   // --- UI Form Management ---
   void openAddProductForm() {
+    _clearForm();
+    isEditMode.value = false; // Reset to add mode
+    
     Get.bottomSheet(
       isScrollControlled: true,
       Container(
@@ -28,7 +64,6 @@ class SellerDashboardController extends GetxController {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -39,13 +74,8 @@ class SellerDashboardController extends GetxController {
               ),
               const Divider(),
               const SizedBox(height: 15),
-
-              // Product Code (Manual Input Only)
               _buildInputField("Product Code", "Enter code", productCodeController, TextInputType.text),
-
               const SizedBox(height: 15),
-
-              // Size and Individual Stock
               _buildLabel("Available Sizes & Stock"),
               Obx(() => Wrap(
                 spacing: 10,
@@ -71,10 +101,7 @@ class SellerDashboardController extends GetxController {
                   );
                 }).toList(),
               )),
-
               const SizedBox(height: 15),
-
-              // Qty and Buying Price Row
               Row(
                 children: [
                   Expanded(child: _buildInputField("Total Qty", "Auto", quantityController, TextInputType.number, enabled: false)),
@@ -82,33 +109,95 @@ class SellerDashboardController extends GetxController {
                   Expanded(child: _buildInputField("Buying Price", "0.0", buyingPriceController, TextInputType.number)),
                 ],
               ),
-
               const SizedBox(height: 15),
-
-              // Selling Price
               _buildInputField("Selling Price", "0.0", sellingPriceController, TextInputType.number),
-
               const SizedBox(height: 25),
-
-              // Save Action
-              SizedBox(
+              Obx(() => SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed: _saveData,
+                  onPressed: isLoading.value ? null : _saveDataToFirebase,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0F172A),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                   ),
-                  child: const Text("Save Product", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: isLoading.value 
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text("Save Product", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-              ),
+              )),
               const SizedBox(height: 20),
             ],
           ),
         ),
       ),
     );
+  }
+
+  // --- Firebase Operations ---
+  Future<void> _saveDataToFirebase() async {
+    if (productCodeController.text.isEmpty || sellingPriceController.text.isEmpty) {
+      Get.snackbar("Error", "Required fields are empty", 
+          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+      return;
+    }
+
+    try {
+      isLoading.value = true;
+      String uid = _auth.currentUser?.uid ?? "";
+
+      if (uid.isEmpty) {
+        Get.snackbar("Auth Error", "Please login again");
+        return;
+      }
+
+      // Prepare data map including the sellerId
+      Map<String, dynamic> productData = {
+        'sellerId': uid, // Links product to the specific merchant
+        'productCode': productCodeController.text.trim(),
+        'totalQuantity': int.tryParse(quantityController.text) ?? 0,
+        'buyingPrice': double.tryParse(buyingPriceController.text) ?? 0.0,
+        'sellingPrice': double.tryParse(sellingPriceController.text) ?? 0.0,
+        'sizes': Map<String, int>.from(sizeQuantities),
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // Save to the general 'products' collection
+      await _firestore.collection('products').add(productData);
+      
+      _clearForm();
+      Get.back();
+      Get.snackbar("Success", "Product added successfully", 
+          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      Get.snackbar("Error", e.toString());
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // Method for updating existing products
+  Future<void> updateProduct(String docId) async {
+    try {
+      isLoading.value = true;
+      Map<String, dynamic> updatedData = {
+        'productCode': productCodeController.text.trim(),
+        'totalQuantity': int.tryParse(quantityController.text) ?? 0,
+        'buyingPrice': double.tryParse(buyingPriceController.text) ?? 0.0,
+        'sellingPrice': double.tryParse(sellingPriceController.text) ?? 0.0,
+        'sizes': Map<String, int>.from(sizeQuantities),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      await _firestore.collection('products').doc(docId).update(updatedData);
+
+      Get.snackbar("Success", "Product updated successfully",
+          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+    } catch (e) {
+      Get.snackbar("Update Error", e.toString(), backgroundColor: Colors.redAccent);
+    } finally {
+      isLoading.value = false;
+    }
   }
 
   // --- Dialogs & Calculations ---
@@ -144,30 +233,6 @@ class SellerDashboardController extends GetxController {
     quantityController.text = total.toString();
   }
 
-  void _saveData() {
-    if (productCodeController.text.isEmpty || sellingPriceController.text.isEmpty) {
-      Get.snackbar("Error", "Required fields are empty", 
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
-      return;
-    }
-
-    // Add to Local List
-    products.add({
-      'productCode': productCodeController.text,
-      'quantity': quantityController.text,
-      'sellingPrice': sellingPriceController.text,
-      'buyingPrice': buyingPriceController.text,
-      'sizes': Map.from(sizeQuantities),
-    });
-
-    // Clear Fields for next entry
-    _clearForm();
-
-    Get.back(); // Close bottom sheet
-    Get.snackbar("Success", "Product added to Inventory", 
-        snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
-  }
-
   void _clearForm() {
     productCodeController.clear();
     quantityController.clear();
@@ -175,27 +240,7 @@ class SellerDashboardController extends GetxController {
     sellingPriceController.clear();
     sizeQuantities.clear();
   }
-  // Product Update Function (Optional)
-void updateProduct(int index) {
-  if (productCodeController.text.isEmpty || sellingPriceController.text.isEmpty) {
-    Get.snackbar("Error", "Fields cannot be empty");
-    return;
-  }
 
-  products[index] = {
-    'productCode': productCodeController.text,
-    'quantity': quantityController.text,
-    'sellingPrice': sellingPriceController.text,
-    'buyingPrice': buyingPriceController.text,
-    'sizes': Map.from(sizeQuantities),
-  };
-
-  products.refresh();
-  Get.back(); 
-  Get.snackbar("Success", "Product updated successfully");
-}
-
-  // --- Helper Widgets ---
   Widget _buildLabel(String text) {
     return Padding(padding: const EdgeInsets.only(bottom: 8.0), child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)));
   }
