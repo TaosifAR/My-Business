@@ -23,34 +23,35 @@ class SellerDashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    // Start listening to data as soon as the controller initializes
+    // Start listening to products on initialization
     listenToProducts();
   }
 
   // --- Real-time Data Sync ---
-  // Listens to products belonging only to the logged-in user
+  // Listens to the products sub-collection inside the current user's document
   void listenToProducts() {
     String? uid = _auth.currentUser?.uid;
     if (uid == null) return;
 
     _firestore
+        .collection('users')
+        .doc(uid)
         .collection('products')
-        .where('sellerId', isEqualTo: uid) // Filter data by the current user's UID
         .snapshots()
         .listen((snapshot) {
-      products.value = snapshot.docs.map((doc) {
-        var data = doc.data();
-        data['docId'] = doc.id;
-        return data;
-      }).toList();
-    });
+          products.value = snapshot.docs.map((doc) {
+            var data = doc.data();
+            data['docId'] = doc.id;
+            return data;
+          }).toList();
+        });
   }
 
   // --- UI Form Management ---
   void openAddProductForm() {
     _clearForm();
-    isEditMode.value = false; // Reset to add mode
-    
+    isEditMode.value = false;
+
     Get.bottomSheet(
       isScrollControlled: true,
       Container(
@@ -67,65 +68,119 @@ class SellerDashboardController extends GetxController {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("Add New Product",
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
-                  IconButton(onPressed: () => Get.back(), icon: const Icon(Icons.close)),
+                  const Text(
+                    "Add New Product",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Get.back(),
+                    icon: const Icon(Icons.close),
+                  ),
                 ],
               ),
               const Divider(),
               const SizedBox(height: 15),
-              _buildInputField("Product Code", "Enter code", productCodeController, TextInputType.text),
+              _buildInputField(
+                "Product Code",
+                "Enter code",
+                productCodeController,
+                TextInputType.text,
+              ),
               const SizedBox(height: 15),
               _buildLabel("Available Sizes & Stock"),
-              Obx(() => Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: ["S", "M", "L", "XL", "XXL"].map((size) {
-                  bool hasStock = sizeQuantities.containsKey(size);
-                  return ChoiceChip(
-                    label: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(size, style: TextStyle(
-                          color: hasStock ? Colors.white : Colors.black, 
-                          fontWeight: FontWeight.bold
-                        )),
-                        if (hasStock)
-                          Text("${sizeQuantities[size]} pcs", 
-                              style: const TextStyle(color: Colors.white, fontSize: 10)),
-                      ],
-                    ),
-                    selected: hasStock,
-                    selectedColor: const Color(0xFF10B981),
-                    onSelected: (val) => showQuantityInputDialog(size),
-                  );
-                }).toList(),
-              )),
+              Obx(
+                () => Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: ["S", "M", "L", "XL", "XXL"].map((size) {
+                    bool hasStock = sizeQuantities.containsKey(size);
+                    return ChoiceChip(
+                      label: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            size,
+                            style: TextStyle(
+                              color: hasStock ? Colors.white : Colors.black,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (hasStock)
+                            Text(
+                              "${sizeQuantities[size]} pcs",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
+                            ),
+                        ],
+                      ),
+                      selected: hasStock,
+                      selectedColor: const Color(0xFF10B981),
+                      onSelected: (val) => showQuantityInputDialog(size),
+                    );
+                  }).toList(),
+                ),
+              ),
               const SizedBox(height: 15),
               Row(
                 children: [
-                  Expanded(child: _buildInputField("Total Qty", "Auto", quantityController, TextInputType.number, enabled: false)),
+                  Expanded(
+                    child: _buildInputField(
+                      "Total Qty",
+                      "Auto",
+                      quantityController,
+                      TextInputType.number,
+                      enabled: false,
+                    ),
+                  ),
                   const SizedBox(width: 15),
-                  Expanded(child: _buildInputField("Buying Price", "0.0", buyingPriceController, TextInputType.number)),
+                  Expanded(
+                    child: _buildInputField(
+                      "Buying Price",
+                      "0.0",
+                      buyingPriceController,
+                      TextInputType.number,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 15),
-              _buildInputField("Selling Price", "0.0", sellingPriceController, TextInputType.number),
+              _buildInputField(
+                "Selling Price",
+                "0.0",
+                sellingPriceController,
+                TextInputType.number,
+              ),
               const SizedBox(height: 25),
-              Obx(() => SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: isLoading.value ? null : _saveDataToFirebase,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              Obx(
+                () => SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: ElevatedButton(
+                    onPressed: isLoading.value ? null : _saveDataToFirebase,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                    ),
+                    child: isLoading.value
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            "Save Product",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                   ),
-                  child: isLoading.value 
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text("Save Product", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 ),
-              )),
+              ),
               const SizedBox(height: 20),
             ],
           ),
@@ -136,9 +191,15 @@ class SellerDashboardController extends GetxController {
 
   // --- Firebase Operations ---
   Future<void> _saveDataToFirebase() async {
-    if (productCodeController.text.isEmpty || sellingPriceController.text.isEmpty) {
-      Get.snackbar("Error", "Required fields are empty", 
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.redAccent, colorText: Colors.white);
+    if (productCodeController.text.isEmpty ||
+        sellingPriceController.text.isEmpty) {
+      Get.snackbar(
+        "Error",
+        "Required fields are empty",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+      );
       return;
     }
 
@@ -151,9 +212,7 @@ class SellerDashboardController extends GetxController {
         return;
       }
 
-      // Prepare data map including the sellerId
       Map<String, dynamic> productData = {
-        'sellerId': uid, // Links product to the specific merchant
         'productCode': productCodeController.text.trim(),
         'totalQuantity': int.tryParse(quantityController.text) ?? 0,
         'buyingPrice': double.tryParse(buyingPriceController.text) ?? 0.0,
@@ -162,13 +221,22 @@ class SellerDashboardController extends GetxController {
         'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // Save to the general 'products' collection
-      await _firestore.collection('products').add(productData);
-      
+      // Path: users -> {uid} -> products -> {auto_id}
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('products')
+          .add(productData);
+
       _clearForm();
       Get.back();
-      Get.snackbar("Success", "Product added successfully", 
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+      Get.snackbar(
+        "Success",
+        "Product added successfully",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
     } catch (e) {
       Get.snackbar("Error", e.toString());
     } finally {
@@ -176,10 +244,14 @@ class SellerDashboardController extends GetxController {
     }
   }
 
-  // Method for updating existing products
+  // Method for updating existing products within the sub-collection
   Future<void> updateProduct(String docId) async {
     try {
       isLoading.value = true;
+      String uid = _auth.currentUser?.uid ?? "";
+
+      if (uid.isEmpty) return;
+
       Map<String, dynamic> updatedData = {
         'productCode': productCodeController.text.trim(),
         'totalQuantity': int.tryParse(quantityController.text) ?? 0,
@@ -189,12 +261,26 @@ class SellerDashboardController extends GetxController {
         'updatedAt': FieldValue.serverTimestamp(),
       };
 
-      await _firestore.collection('products').doc(docId).update(updatedData);
+      await _firestore
+          .collection('users')
+          .doc(uid)
+          .collection('products')
+          .doc(docId)
+          .update(updatedData);
 
-      Get.snackbar("Success", "Product updated successfully",
-          snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+      Get.snackbar(
+        "Success",
+        "Product updated successfully",
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
     } catch (e) {
-      Get.snackbar("Update Error", e.toString(), backgroundColor: Colors.redAccent);
+      Get.snackbar(
+        "Update Error",
+        e.toString(),
+        backgroundColor: Colors.redAccent,
+      );
     } finally {
       isLoading.value = false;
     }
@@ -203,14 +289,21 @@ class SellerDashboardController extends GetxController {
   // --- Dialogs & Calculations ---
   void showQuantityInputDialog(String size) {
     final qtyInputController = TextEditingController(
-        text: sizeQuantities.containsKey(size) ? sizeQuantities[size].toString() : "");
+      text: sizeQuantities.containsKey(size)
+          ? sizeQuantities[size].toString()
+          : "",
+    );
 
     Get.defaultDialog(
       title: "Stock for Size $size",
       content: TextField(
         controller: qtyInputController,
         keyboardType: TextInputType.number,
-        decoration: InputDecoration(hintText: "Enter quantity", filled: true, fillColor: Colors.grey.shade100),
+        decoration: InputDecoration(
+          hintText: "Enter quantity",
+          filled: true,
+          fillColor: Colors.grey.shade100,
+        ),
       ),
       confirm: ElevatedButton(
         onPressed: () {
@@ -242,10 +335,19 @@ class SellerDashboardController extends GetxController {
   }
 
   Widget _buildLabel(String text) {
-    return Padding(padding: const EdgeInsets.only(bottom: 8.0), child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+    );
   }
 
-  Widget _buildInputField(String label, String hint, TextEditingController controller, TextInputType type, {bool enabled = true}) {
+  Widget _buildInputField(
+    String label,
+    String hint,
+    TextEditingController controller,
+    TextInputType type, {
+    bool enabled = true,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -258,7 +360,10 @@ class SellerDashboardController extends GetxController {
             hintText: hint,
             filled: true,
             fillColor: enabled ? const Color(0xFFF8FAFC) : Colors.grey.shade200,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
       ],

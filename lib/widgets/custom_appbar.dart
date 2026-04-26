@@ -30,10 +30,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
      
       leading: showBackButton
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
-              onPressed: () => Get.back(),
-            )
+          ?IconButton(
+  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
+  onPressed: () {
+    // Check if there is a screen to pop back to
+    if (Get.key.currentState?.canPop() ?? false) {
+      Get.back();
+    } else {
+      // If no screen exists in the stack, navigate to Home
+      Get.offAllNamed('/home'); 
+    }
+  },
+)
           : IconButton(
               icon: const Icon(Icons.menu_rounded, color: Color(0xFF0F172A)),
               onPressed: () {

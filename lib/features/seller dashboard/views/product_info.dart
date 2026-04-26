@@ -7,28 +7,39 @@ class ProductInfoScreen extends StatelessWidget {
   final SellerDashboardController controller = Get.find();
 
   ProductInfoScreen({super.key, required this.index}) {
-    // Initializing state
+    _initializeData();
+  }
+
+  void _initializeData() {
+    // Reset state
     controller.isEditMode.value = false;
 
-    // Fetch the specific product from the list
-    var product = controller.products[index];
+    // Fetch product data safely
+    if (index >= 0 && index < controller.products.length) {
+      var product = controller.products[index];
 
-    // Filling controllers with saved data
-    controller.productCodeController.text = product['productCode']?.toString() ?? "";
-    controller.buyingPriceController.text = product['buyingPrice']?.toString() ?? "0.0";
-    controller.sellingPriceController.text = product['sellingPrice']?.toString() ?? "0.0";
-    controller.quantityController.text = product['totalQuantity']?.toString() ?? "0";
+      // Initialize Text Controllers
+      controller.productCodeController.text = product['productCode']?.toString() ?? "";
+      controller.buyingPriceController.text = product['buyingPrice']?.toString() ?? "0.0";
+      controller.sellingPriceController.text = product['sellingPrice']?.toString() ?? "0.0";
+      controller.quantityController.text = product['totalQuantity']?.toString() ?? "0";
 
-    if (product['sizes'] != null) {
-      controller.sizeQuantities.assignAll(
-        Map<String, int>.from(product['sizes']),
-      );
+      // Initialize Size Map safely
+      if (product['sizes'] != null) {
+        Map<String, int> convertedSizes = {};
+        (product['sizes'] as Map).forEach((key, value) {
+          convertedSizes[key.toString()] = int.tryParse(value.toString()) ?? 0;
+        });
+        controller.sizeQuantities.assignAll(convertedSizes);
+      } else {
+        controller.sizeQuantities.clear();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Getting the product again inside build to get the docId
+    // Get docId from reactive list
     var product = controller.products[index];
     String docId = product['docId'] ?? "";
 
@@ -43,12 +54,12 @@ class ProductInfoScreen extends StatelessWidget {
         elevation: 0,
         actions: [
           Obx(() => IconButton(
-                icon: Icon(
-                  controller.isEditMode.value ? Icons.lock_open : Icons.edit,
-                  color: controller.isEditMode.value ? Colors.green : Colors.blue,
-                ),
-                onPressed: () => controller.isEditMode.toggle(),
-              )),
+            icon: Icon(
+              controller.isEditMode.value ? Icons.lock_open : Icons.edit,
+              color: controller.isEditMode.value ? Colors.green : Colors.blue,
+            ),
+            onPressed: () => controller.isEditMode.toggle(),
+          )),
         ],
         iconTheme: const IconThemeData(color: Colors.black),
       ),
@@ -70,28 +81,35 @@ class ProductInfoScreen extends StatelessWidget {
               const SizedBox(height: 25),
 
               const Text(
-                "Stock by Size",
-                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 13),
+                "STOCK BY SIZE",
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 11),
               ),
               const SizedBox(height: 12),
               
+              // Reactive Size Chips
               Obx(() => Wrap(
                 spacing: 10,
                 runSpacing: 10,
                 children: ["S", "M", "L", "XL", "XXL"].map((size) {
-                  bool hasStock = controller.sizeQuantities.containsKey(size);
-                  return ActionChip(
-                    label: Text(
-                      "$size ${hasStock ? '(${controller.sizeQuantities[size]})' : ''}",
-                      style: TextStyle(
-                        color: hasStock ? Colors.white : Colors.black87,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    backgroundColor: hasStock ? const Color(0xFF10B981) : Colors.grey.shade100,
-                    onPressed: controller.isEditMode.value
-                        ? () => controller.showQuantityInputDialog(size)
+                  int quantity = controller.sizeQuantities[size] ?? 0;
+                  bool hasStock = quantity > 0;
+                  
+                  return InkWell(
+                    onTap: controller.isEditMode.value 
+                        ? () => controller.showQuantityInputDialog(size) 
                         : null,
+                    borderRadius: BorderRadius.circular(30),
+                    child: Chip(
+                      label: Text(
+                        "$size ${quantity > 0 ? '($quantity)' : ''}",
+                        style: TextStyle(
+                          color: hasStock ? Colors.white : Colors.black87,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      backgroundColor: hasStock ? const Color(0xFF10B981) : Colors.grey.shade100,
+                      side: BorderSide(color: hasStock ? Colors.transparent : Colors.grey.shade300),
+                    ),
                   );
                 }).toList(),
               )),
@@ -127,14 +145,13 @@ class ProductInfoScreen extends StatelessWidget {
 
               const SizedBox(height: 40),
 
-              // Save Changes button shows only when in Edit Mode
+              // Save Button
               Obx(() => controller.isEditMode.value 
                 ? SizedBox(
                     width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
                       onPressed: () async {
-                        // Using docId instead of index for safer update
                         await controller.updateProduct(docId);
                         controller.isEditMode.value = false;
                       },
@@ -162,21 +179,23 @@ class ProductInfoScreen extends StatelessWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 11),
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 11, letterSpacing: 0.5),
         ),
+        const SizedBox(height: 4),
         TextField(
           controller: ctr,
           enabled: enabled,
           keyboardType: TextInputType.number,
-          style: TextStyle(
-            color: enabled ? Colors.black : Colors.black54,
+          style: const TextStyle(
+            color: Colors.black, 
             fontWeight: FontWeight.w600,
             fontSize: 16,
           ),
           decoration: InputDecoration(
             isDense: true,
             contentPadding: const EdgeInsets.symmetric(vertical: 10),
-            border: enabled ? const UnderlineInputBorder() : InputBorder.none,
+            disabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey.shade200)),
+            enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.grey)),
             focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF0F172A), width: 2)),
           ),
         ),

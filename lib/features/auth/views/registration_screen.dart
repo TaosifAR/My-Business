@@ -121,32 +121,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 const SizedBox(height: 30),
 
                 // Register Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Trigger validation
-                      if (_formKey.currentState!.validate()) {
-                        authController.register(
-                          nameController.text.trim(),
-                          emailController.text.trim(),
-                          passwordController.text,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                    ),
-                    child: const Text(
-                      "Register",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ),
-                ),
+              Obx(() => SizedBox(
+  width: double.infinity,
+  height: 55,
+  child: ElevatedButton(
+    onPressed: authController.isLoading.value 
+      ? null 
+      : () {
+          if (_formKey.currentState!.validate()) {
+            authController.register(
+              nameController.text.trim(),
+              emailController.text.trim(),
+              passwordController.text,
+            );
+          }
+        },
+    child: authController.isLoading.value 
+      ? const CircularProgressIndicator(color: Colors.white)
+      : const Text("Register", style: TextStyle(color: Colors.white)),
+  ),
+)),
                 const SizedBox(height: 20),
               ],
             ),

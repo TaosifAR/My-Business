@@ -65,7 +65,7 @@ class ProductBannerCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                "\$$price",
+                "\৳$price",
                 style: const TextStyle(
                   fontWeight: FontWeight.bold, 
                   fontSize: 18, 
