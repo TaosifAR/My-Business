@@ -1,0 +1,23 @@
+# Set the iOS version to 13.0 or 15.0 as required by your plugins
+platform :ios, '13.0'
+
+# Default Flutter setup
+include_parts_relative_path = File.expand_path(File.join('..', '..', 'flutter', 'packages', 'flutter_tools', 'bin', 'podhelper.rb'), __FILE__)
+require include_parts_relative_path
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      # Force all pods to use the minimum deployment target of 13.0
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+    end
+  end
+end

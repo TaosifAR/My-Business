@@ -80,8 +80,7 @@ class BusinessReportController extends GetxController {
 
         double sPrice = (data['sellingPrice'] ?? 0).toDouble();
         double profit = (data['totalProfit'] ?? 0).toDouble();
-
-        salesRevenue += sPrice;
+        salesRevenue += (sPrice * sQty);
         grossProfit += profit;
       }
 
